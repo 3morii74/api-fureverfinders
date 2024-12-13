@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use MongoDB\Laravel\Eloquent\Model;
 
 class Cat extends Model
 {
-    protected $connection = 'mongodb'; // Define MongoDB as the connection
+    protected $connection = 'mongodb';
     protected $collection = 'cats';
     protected $fillable = [
         'pet_name',

@@ -2,9 +2,26 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use MongoDB\Laravel\Eloquent\Model;
 
 class Dog extends Model
 {
-    //
+    protected $connection = 'mongodb';
+    protected $collection = 'dogs';
+    protected $fillable = [
+        'pet_name',
+        'year',
+        'month',
+        'address',
+        'weight',
+        'description',
+        'user_id',
+        'gender',
+        'status',
+        'images',
+    ];
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }
