@@ -10,12 +10,13 @@ use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
-    public function show()
+    public function show(Request $request)
     {
+
         try {
             // Fetch the authenticated user
-            $user = auth()->user();
 
+            $user = auth()->user();
             // Fetch dogs and cats related to the authenticated user, along with images
             $dogs = Dog::where('user_id', $user->id)->get();
             $cats = Cat::where('user_id', $user->id)->get();
@@ -36,25 +37,23 @@ class UserController extends Controller
         try {
             // Get the authenticated user
             $user = auth()->user();
-
             // Validate the input for pet type and id
             $validatedData = $request->validate([
                 'type' => 'required|in:dog,cat',  // Ensure 'type' is either 'dog' or 'cat'
-                'id' => 'required|integer', // Ensure 'id' is an integer
+                'id' => 'required', // Ensure 'id' is an integer
             ]);
 
             // Check if the pet exists based on the type and id
             if ($validatedData['type'] === 'dog') {
-                $pet = $user->dogs()->find($validatedData['id']);  // Find the dog belonging to the user
+                $pet = Dog::where('user_id', $user->id)->where('id', $request['id'])->first(); //$user->dogs()->find($validatedData['id']);  // Find the dog belonging to the user
             } else {
-                $pet = $user->cats()->find($validatedData['id']);  // Find the cat belonging to the user
+                $pet =  Cat::where('user_id', $user->id)->where('id', $request['id'])->first();  // Find the cat belonging to the user
             }
 
             // If pet not found, return an error
             if (!$pet) {
                 return response()->json(['message' => 'Pet not found or does not belong to the user.'], 404);
             }
-
             // Proceed to delete the pet
             $pet->delete();
 

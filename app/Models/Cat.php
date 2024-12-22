@@ -19,6 +19,7 @@ class Cat extends Model
         'gender',
         'status',
         'images',
+        'imageVector'
     ];
     public function user()
     {

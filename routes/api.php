@@ -19,15 +19,15 @@ use App\Http\Middleware\JwtMiddleware;
 
 //     Route::post('/pets/store', [Pets::class, 'store']);
 // });
-Route::post('register', [AuthController::class, 'register']);
-Route::post('login', [AuthController::class, 'login']);
-Route::get('/pets/index', [PetsController::class, 'index']);
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/pets/index', [PetsController::class, 'index']);
 
 Route::middleware('auth:api')->group(function () {
     // Store a new cat's information
     Route::post('/pets/store', [PetsController::class, 'store']);
-    Route::get('user', [AuthController::class, 'me']);
-    Route::post('logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'me']);
+    Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user/show', [UserController::class, 'show']);
     Route::delete('/user/deletepet', [UserController::class, 'destroy']);
 });
