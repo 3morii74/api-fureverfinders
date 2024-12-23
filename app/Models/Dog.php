@@ -25,4 +25,15 @@ class Dog extends Model
     {
         return $this->belongsTo(User::class);
     }
+    public static function boot()
+    {
+        parent::boot();
+
+        // Ensure a 2dsphere index is created on the address field
+        static::addGlobalScope('geospatial', function ($builder) {
+            $builder->raw(function ($query) {
+                $query->createIndex(['address' => '2dsphere']);
+            });
+        });
+    }
 }

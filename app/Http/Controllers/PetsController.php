@@ -21,7 +21,8 @@ class PetsController extends Controller
             'gender'      => 'required|in:male,female',
             'year'        => 'nullable|integer|min:0|max:30',
             'month'       => 'nullable|integer|min:0|max:12',
-            'address'     => 'required|string|max:255',
+            'latitude'       => 'nullable|numeric|min:0',
+            'longitude'       => 'nullable|numeric|min:0',
             'weight'      => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'images'      => 'required|array', // Validate as an array of images
@@ -50,6 +51,10 @@ class PetsController extends Controller
             // Convert image content to base64
             $imageVector[] = $this->extractFeatureVector($imageContent);
         }
+        $coordinates = [
+            (float) $request->input('longitude'), // Ensure longitude is a float
+            (float) $request->input('latitude')  // Ensure latitude is a float
+        ];
         if ($request['type'] === 'dog') {
             $dog = Dog::create([
                 'user_id' => auth()->id(),
@@ -57,7 +62,10 @@ class PetsController extends Controller
                 'gender'      => $request['gender'],
                 'year'        => $request['year'],
                 'month'       => $request['month'],
-                'address'     => $request['address'],
+                'address' => [
+                    'type' => 'Point',
+                    'coordinates' => $coordinates // [longitude, latitude]
+                ],
                 'weight'      => $request['weight'],
                 'description' => $request['description'],
                 'status' => $request['status'],
@@ -75,7 +83,10 @@ class PetsController extends Controller
                 'gender'      => $request['gender'],
                 'year'        => $request['year'],
                 'month'       => $request['month'],
-                'address'     => $request['address'],
+                'address' => [
+                    'type' => 'Point',
+                    'coordinates' => $coordinates // [longitude, latitude]
+                ],
                 'weight'      => $request['weight'],
                 'description' => $request['description'],
                 'status' => $request['status'],
@@ -131,6 +142,37 @@ class PetsController extends Controller
             });
         }
 
+        if ($request->has('latitude') && $request->has('longitude')) {
+            $latitude = $request->latitude;
+            $longitude = $request->longitude;
+            $maxDistance = 10000000; // Max distance in meters (e.g., 10000 km)
+
+            // Perform geospatial query to find nearby dogs and cats
+            $dogsQuery->whereRaw([
+                'address' => [
+                    '$nearSphere' => [
+                        '$geometry' => [
+                            'type' => 'Point',
+                            'coordinates' => [(float)$longitude, (float)$latitude],
+                        ],
+                        '$maxDistance' => $maxDistance, // distance in meters
+                    ],
+                ],
+            ]);
+
+            $catsQuery->whereRaw([
+                'address' => [
+                    '$nearSphere' => [
+                        '$geometry' => [
+                            'type' => 'Point',
+                            'coordinates' => [(float)$longitude, (float)$latitude],
+                        ],
+                        '$maxDistance' => $maxDistance, // distance in meters
+                    ],
+                ],
+            ]);
+        }
+
         // Step 5: Filter by text search (name or description)
         if ($request->has('search')) {
             $search = $request->search;
@@ -154,7 +196,6 @@ class PetsController extends Controller
             $featureVector = $this->extractFeatureVector($imageContent);
             // Step 6b: Query MongoDB for similar cats and dogs
             $similarCats = $this->findSimilarPets('cat', $featureVector);
-
             $similarDogs = $this->findSimilarPets('dog', $featureVector);
         }
 
@@ -216,7 +257,8 @@ class PetsController extends Controller
         }
         // Call the Python script to extract features
         $scriptPath = base_path('storage/scripts/extract_features.py');
-        $command = escapeshellcmd("python " . $scriptPath . " " . $tempImagePath);
+        // $command = escapeshellcmd("python " . $scriptPath . " " . $tempImagePath);
+        $command = escapeshellcmd("python3 " . $scriptPath . " " . $tempImagePath);
         $output = shell_exec($command);
         $output = shell_exec($command . " 2>&1");
         if ($output === null) {
@@ -236,9 +278,10 @@ class PetsController extends Controller
     // Helper function to find similar pets in MongoDB
     private function calculateCosineSimilarity($vector1, $vector2)
     {
-        if (is_null($vector2)) {
+        if (is_null($vector2) || is_null($vector1)) {
             // Handle the null case, e.g., return a default value or throw an exception
-            throw new \InvalidArgumentException("Second array cannot be null.");
+            // throw new \InvalidArgumentException("Second array cannot be null.");
+            return 0;
         }
         $dotProduct = array_sum(array_map(fn($a, $b) => $a * $b, $vector1, $vector2));
         $magnitude1 = sqrt(array_sum(array_map(fn($value) => $value * $value, $vector1)));
