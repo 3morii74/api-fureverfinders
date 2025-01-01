@@ -26,7 +26,7 @@ class PetsController extends Controller
             'weight'      => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'images'      => 'required|array', // Validate as an array of images
-            'images.*'    => 'image|mimes:jpg,jpeg,png,gif,svg|max:10048', // Validate each file
+            'images.*'    => 'image|mimes:jpg,jpeg,png,gif,svg|max:102400', // Validate each file
             'status'      => 'required|in:pairing,adopted',
         ]);
 
@@ -39,7 +39,6 @@ class PetsController extends Controller
         foreach ($request->file('images') as $image) {
             // Get image content as a string
             $imageContent = file_get_contents($image->getRealPath());
-
             // Convert image content to base64
             $imageBase64s[] = base64_encode($imageContent); // Store as base64 string
         }
@@ -205,19 +204,35 @@ class PetsController extends Controller
         }
 
         // Step 4: Filter by age range
-        if ($request->has('min_age') || $request->has('max_age')) {
-            $dogsQuery->when($request->has('min_age'), function ($query) use ($request) {
-                return $query->where('year', '>=', $request->min_age);
+        if ($request->has('min_age_year')) {
+            $dogsQuery->when($request->has('min_age_year'), function ($query) use ($request) {
+                return $query->where('year', '>=', $request->min_age_year);
             })->when($request->has('max_age'), function ($query) use ($request) {
                 return $query->where('year', '<=', $request->max_age);
             });
 
-            $catsQuery->when($request->has('min_age'), function ($query) use ($request) {
-                return $query->where('year', '>=', $request->min_age);
+            $catsQuery->when($request->has('min_age_year'), function ($query) use ($request) {
+                return $query->where('year', '>=', $request->min_age_year);
             })->when($request->has('max_age'), function ($query) use ($request) {
                 return $query->where('year', '<=', $request->max_age);
             });
         }
+        if ($request->has('min_age_month')) {
+            $dogsQuery->when($request->has('min_age_month'), function ($query) use ($request) {
+                return $query->where(function ($subQuery) use ($request) {
+                    $subQuery->where('month', '>=', $request->min_age_month)
+                        ->orWhere('year', '>', 0); // Include records with year > 0
+                });
+            });
+
+            $catsQuery->when($request->has('min_age_month'), function ($query) use ($request) {
+                return $query->where(function ($subQuery) use ($request) {
+                    $subQuery->where('month', '>=', $request->min_age_month)
+                        ->orWhere('year', '>', 0); // Include records with year > 0
+                });
+            });
+        }
+
 
         if ($request->has('latitude') && $request->has('longitude')) {
             $latitude = $request->latitude;
