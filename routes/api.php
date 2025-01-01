@@ -26,6 +26,7 @@ Route::post('/pets/index', [PetsController::class, 'index']);
 Route::middleware('auth:api')->group(function () {
     // Store a new cat's information
     Route::post('/pets/store', [PetsController::class, 'store']);
+    Route::post('/pets/update/{id}', [PetsController::class, 'update']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user/show', [UserController::class, 'show']);

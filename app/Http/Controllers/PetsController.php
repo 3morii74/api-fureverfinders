@@ -106,6 +106,83 @@ class PetsController extends Controller
             'message' => $responseMessage,
         ], 201);
     }
+    public function update(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'pet_name'    => 'sometimes|required|string|max:255',
+            'type'        => 'sometimes|required|in:dog,cat',
+            'gender'      => 'sometimes|required|in:male,female',
+            'year'        => 'nullable|integer|min:0|max:30',
+            'month'       => 'nullable|integer|min:0|max:12',
+            'latitude'    => 'nullable|numeric|min:0',
+            'longitude'   => 'nullable|numeric|min:0',
+            'weight'      => 'nullable|numeric|min:0',
+            'description' => 'nullable|string|max:1000',
+            'images'      => 'nullable|array',
+            'images.*'    => 'image|mimes:jpg,jpeg,png,gif,svg|max:10048', // Validate each file
+            'status'      => 'sometimes|required|in:pairing,adopted',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        // Determine the type of pet (dog or cat)
+        $model = null;
+        if ($request->input('type') === 'dog' || Dog::find($id)) {
+            $model = Dog::find($id);
+        } elseif ($request->input('type') === 'cat' || Cat::find($id)) {
+            $model = Cat::find($id);
+        }
+
+        if (!$model) {
+            return response()->json(['error' => 'Pet not found'], 404);
+        }
+
+        // Handle images if provided
+        $updatedImages = $model->images ?? [];
+        $imageVector = $model->imageVector ?? [];
+
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $image) {
+                $imageContent = file_get_contents($image->getRealPath());
+                $updatedImages[] = base64_encode($imageContent);
+                $imageVector[] = $this->extractFeatureVector($imageContent);
+            }
+        }
+
+        // Update the address if latitude and longitude are provided
+        $coordinates = $model->address['coordinates'] ?? [0, 0];
+        if ($request->has('latitude') && $request->has('longitude')) {
+            $coordinates = [
+                (float) $request->input('longitude'),
+                (float) $request->input('latitude')
+            ];
+        }
+
+        $model->update(array_merge($model->toArray(), [
+            'pet_name'    => $request->input('pet_name', $model->pet_name),
+            'gender'      => $request->input('gender', $model->gender),
+            'year'        => $request->input('year', $model->year),
+            'month'       => $request->input('month', $model->month),
+            'address'     => [
+                'type'        => 'Point',
+                'coordinates' => $coordinates,
+            ],
+            'weight'      => $request->input('weight', $model->weight),
+            'description' => $request->input('description', $model->description),
+            'status'      => $request->input('status', $model->status),
+            'images'      => $updatedImages,
+            'imageVector' => $imageVector,
+        ]));
+
+
+        return response()->json([
+            'data'    => $model,
+            'message' => ucfirst($model->type) . ' updated successfully!',
+        ], 200);
+    }
+
     public function index(Request $request)
     {
         // Step 1: Prepare the base queries for cats and dogs
@@ -145,7 +222,7 @@ class PetsController extends Controller
         if ($request->has('latitude') && $request->has('longitude')) {
             $latitude = $request->latitude;
             $longitude = $request->longitude;
-            $maxDistance = 10000000; // Max distance in meters (e.g., 10000 km)
+            $maxDistance = 1000000; // Max distance in meters (e.g., 1000 km)
 
             // Perform geospatial query to find nearby dogs and cats
             $dogsQuery->whereRaw([
@@ -193,7 +270,9 @@ class PetsController extends Controller
             $uploadedImage = $request->file('image');
             $imageContent = file_get_contents($uploadedImage->getRealPath());
             // Step 6a: Extract feature vector (call an external Python script or a service)
+
             $featureVector = $this->extractFeatureVector($imageContent);
+
             // Step 6b: Query MongoDB for similar cats and dogs
             $similarCats = $this->findSimilarPets('cat', $featureVector);
             $similarDogs = $this->findSimilarPets('dog', $featureVector);
